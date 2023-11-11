@@ -52,9 +52,13 @@ def sudoku_print(myfile, sudoku):
 # get number of constraints for sudoku
 def sudoku_constraints_number(sudoku):
     N = len(sudoku)
-    # Here generate the number of constraints
-    count = 0
-    return count
+
+    count = 4 * (N ** 2) * ( 1 + N * (N - 1) / 2)
+
+    pre_filled_count = sum(1 for line in sudoku for number in line if number > 0)  # Now this should work
+
+    print(count + pre_filled_count)
+    return count + pre_filled_count
 
 # prints the generic constraints for sudoku of size N
 def sudoku_generic_constraints(myfile, N):
@@ -63,14 +67,16 @@ def sudoku_generic_constraints(myfile, N):
         myfile.write(s)
 
     # Notice that the following function only works for N = 4 or N = 9
-    def newlit(i,j,k):
-        output(str(i)+str(j)+str(k)+ " ")
+    def newlit(i,j,k, N=N):
+        output(str(i * N + j)+str(k).zfill(2)+ " ")
+
+    def newneglit(i,j,k, N=N):
+        output("-"+ str(i * N + j)+str(k).zfill(2)+ " ")
 
     def newcl():
         output("0\n")
 
     def newcomment(s):
-#        output("c %s\n"%s)
         output("")
 
     if N == 4:
@@ -84,8 +90,97 @@ def sudoku_generic_constraints(myfile, N):
     else:
         exit("Only supports size 4, 9, 16 and 25")
 
-    # Here should come the constraint generation
-    # ...
+    # First, let's ensure that the solver have to fill in every cell with at least a number, ad that it appears at least one 
+    # time per column, row, and block
+
+    # each cell contains a number
+    for row in range(N):
+        for col in range(N):
+            for nb in range(1, N + 1):
+                # Create the constraint that this number must be in this cell
+                newlit(row, col, nb)
+            newcl()
+
+    # each column contains every number once
+    for col in range(N):
+        for nb in range(1, N + 1):
+            for row in range(N):
+                # Create the constraint that this number must be in this column
+                newlit(row, col, nb)
+            newcl()
+                
+    # each row contains every number once
+    for row in range(N):
+        for nb in range(1, N + 1):
+            for col in range(N):
+                # Create the constraint that this number must be in this row
+                newlit(row, col, nb)
+            newcl()
+
+    # each block contains every number once
+    for block in range(N):
+        # Calculate the starting row and column for this block
+        block_row = (block // n) * n
+        block_col = (block % n) * n
+
+        # Now iterate over each cell within the block
+        for row in range(block_row, block_row + n):
+            for col in range(block_col, block_col + n):
+                for number in range(1, N + 1):
+                    # Create the constraint that this number must be in this block
+                    newlit(row, col, number)
+                newcl()
+
+
+    # Now, We need to ensure that every row, col, block has every number at most once
+    # each cell contains at most one number
+    for row in range(N):
+        for col in range(N):
+            for nb1 in range(1, N + 1):
+                for nb2 in range(nb1 + 1, N + 1):
+                    newneglit(row, col, nb1)
+                    newneglit(row, col, nb2)
+                    newcl()
+
+    # for each line, each number appears at most once
+    for row in range(N):
+        for nb in range(1, N+1):
+            for col1 in range(N):
+                for col2 in range(col1 + 1, N):
+                    newneglit(row, col1, nb)
+                    newneglit(row, col2, nb)
+                    newcl()
+
+    # for each column, each number appears at most once
+    for col in range(N):
+        for nb in range(1, N + 1):
+            for row1 in range(N):
+                for row2 in range(row1 + 1, N):
+                    newneglit(row1, col, nb)
+                    newneglit(row2, col, nb)
+                    newcl()
+
+# for each block, each number appears at most once
+    for block in range(N):
+        # Calculate the starting row and column for this block
+        block_row = (block // n) * n
+        block_col = (block % n) * n
+
+        # Now iterate over each number within the block
+        for number in range(1, N + 1):
+            # Iterate over each cell within the block
+            for row1 in range(block_row, block_row + n):
+                for col1 in range(block_col, block_col + n):
+                    # Now iterate over each cell again within the block to create pairs
+                    for row2 in range(block_row, block_row + n):
+                        for col2 in range(block_col, block_col + n):
+                            # Ensure we don't compare a cell with itself
+                            if row1 == row2 and col1 == col2:
+                                continue
+                            # Create the constraint that this number cannot be in both cells
+                            newneglit(row1, col1, number)
+                            newneglit(row2, col2, number)
+                            newcl()
 
 
 def sudoku_specific_constraints(myfile, sudoku):
@@ -95,9 +190,9 @@ def sudoku_specific_constraints(myfile, sudoku):
     def output(s):
         myfile.write(s)
 
-    # Notice that the following function only works for N = 4 or N = 9
-    def newlit(i,j,k):
-        output(str(i)+str(j)+str(k)+ " ")
+    # Fixed
+    def newlit(i,j,k, N=N):
+        output(str(i * N + j)+str(k).zfill(2)+ " ")
 
     def newcl():
         output("0\n")
@@ -105,7 +200,7 @@ def sudoku_specific_constraints(myfile, sudoku):
     for i in range(N):
         for j in range(N):
             if sudoku[i][j] > 0:
-                newlit(i + 1, j + 1, sudoku[i][j])
+                newlit(i, j, sudoku[i][j])
                 newcl()
 
 def sudoku_other_solution_constraint(myfile, sudoku):
@@ -115,15 +210,17 @@ def sudoku_other_solution_constraint(myfile, sudoku):
     def output(s):
         myfile.write(s)
 
-    # Notice that the following function only works for N = 4 or N = 9
-    def newlit(i,j,k):
-        output(str(i)+str(j)+str(k)+ " ")
+    def newneglit(i,j,k, N=N):
+        output("-" + str(i * N + j)+str(k).zfill(2)+ " ")
 
     def newcl():
         output("0\n")
 
-    # Here should come the constraint generation
-    # ...
+    # Added a constraint that tells that at least one of the numbers in the first solution must be different in the other.
+    for row in range(N):
+        for col in range(N):
+                nb = sudoku[row][col]
+                newneglit(row, col, nb)
     newcl()
                 
 def sudoku_solve(filename):
@@ -157,17 +254,161 @@ def sudoku_solve(filename):
             else:
                 exit("strange output from SAT solver:" + line + "\n")
             sudoku = [ [0 for i in range(N)] for j in range(N)]
-            # Notice that the following function only works for N = 4 or N = 9
+            # Notice that the following function works
             for number in units:
-                sudoku[number // 100 - 1][( number // 10 )% 10 - 1] = number % 10
+                last_two = number % 100
+                first_digits = number // 100
+
+                i = first_digits // N
+                j = first_digits % N
+
+                sudoku[i][j] = last_two
+            
             return sudoku
         exit("strange output from SAT solver:" + line + "\n")
         return []
-
-def sudoku_generate(size):
-    #TODO
-    return []
     
+import random
+def sudoku_generate(size):
+
+    if size in [4, 9]:
+        health = size*size
+    elif size == 16:
+        health = size * 4
+    else :
+        health = 5
+
+    sudoku = [[ 0 for _ in range(size)] for _ in range(size)]
+
+    # First, we need to generate a random solution
+
+    sudoku[random.randint(0, size - 1)][random.randint(0, size - 1)] = random.randint(1, size)
+    sudoku_print(sys.stdout, sudoku)
+
+    with open("sudoku.cnf", 'w') as myfile:
+        myfile.write("p cnf " + str(size**2) + str(size).zfill(2)  +" "+
+                     str(sudoku_constraints_number(sudoku))+"\n")
+        sudoku_generic_constraints(myfile, size)
+        sudoku_specific_constraints(myfile, sudoku)
+    
+    sudoku = sudoku_solve("sudoku.cnf")
+
+    sudoku_print(sys.stdout, sudoku)
+
+    print("Solution found, starting to remove numbers...")
+    # Now, we need to remove numbers from the solution until it is not unique anymore
+    while True:
+        # Pick a random number
+        row = random.randint(0, size - 1)
+        col = random.randint(0, size - 1)
+
+        nb = sudoku[row][col]
+
+
+        # If it is already 0, then we can't remove it
+        if nb == 0:
+            continue
+
+        # Remove the number
+        sudoku[row][col] = 0
+
+        with open("sudoku.cnf", 'w') as myfile:
+            myfile.write("p cnf " + str(size**2) + str(size).zfill(2)  +" "+
+                        str(sudoku_constraints_number(sudoku))+"\n")
+            sudoku_generic_constraints(myfile, size)
+            sudoku_specific_constraints(myfile, sudoku)
+
+        temp = sudoku_solve("sudoku.cnf")
+
+        with open("sudoku.cnf", 'a') as myfile:
+            sudoku_other_solution_constraint(myfile, temp)
+
+        solvable = sudoku_solve(sudoku)
+
+        print("Health: " + str(health))
+        if solvable == []:
+            continue
+        else:
+            sudoku[row][col] = nb
+            health -= 1
+
+            if health == 0:
+                break
+        
+    return sudoku 
+    
+
+def sudoku_generate_cm(size):
+
+    if size in [4, 9]:
+        health = size*size
+    elif size == 16:
+        health = size * 4
+    else :
+        health = 5
+
+    sudoku = [[ 0 for _ in range(size)] for _ in range(size)]
+
+    # First, we need to generate a random solution
+
+    sudoku[random.randint(0, size - 1)][random.randint(0, size - 1)] = random.randint(1, size)
+    sudoku_print(sys.stdout, sudoku)
+
+    with open("sudoku.cnf", 'w') as myfile:
+        myfile.write("p cnf " + str(size**2) + str(size).zfill(2)  +" "+
+                     str(sudoku_constraints_number(sudoku))+"\n")
+        sudoku_generic_constraints(myfile, size)
+        sudoku_specific_constraints(myfile, sudoku)
+    
+    sudoku = sudoku_solve("sudoku.cnf")
+
+    # Remove ever number == size
+    for row in range(size):
+        for col in range(size):
+            if sudoku[row][col] == size:
+                sudoku[row][col] = 0
+
+    sudoku_print(sys.stdout, sudoku)
+
+    print("Solution found, starting to remove numbers...")
+    # Now, we need to remove numbers from the solution until it is not unique anymore
+    while True:
+        # Pick a random number
+        row = random.randint(0, size - 1)
+        col = random.randint(0, size - 1)
+
+        nb = sudoku[row][col]
+
+        # If it is already 0, then we can't remove it
+        if nb == 0:
+            continue
+
+        # Remove the number
+        sudoku[row][col] = 0
+
+        with open("sudoku.cnf", 'w') as myfile:
+            myfile.write("p cnf " + str(size**2) + str(size).zfill(2)  +" "+
+                        str(sudoku_constraints_number(sudoku))+"\n")
+            sudoku_generic_constraints(myfile, size)
+            sudoku_specific_constraints(myfile, sudoku)
+
+        temp = sudoku_solve("sudoku.cnf")
+
+        with open("sudoku.cnf", 'a') as myfile:
+            sudoku_other_solution_constraint(myfile, temp)
+
+        solvable = sudoku_solve(sudoku)
+        print("Health: " + str(health))
+        if solvable == []:
+            continue
+        else:
+            sudoku[row][col] = nb
+            health -= 1
+            if health == 0:
+                break
+        
+    return sudoku 
+
 from enum import Enum
 class Mode(Enum):
     SOLVE = 1
@@ -198,7 +439,7 @@ if mode == Mode.SOLVE or mode == Mode.UNIQUE:
     N = len(sudoku)
     myfile = open("sudoku.cnf", 'w')
     # Notice that this may not be correct for N > 9
-    myfile.write("p cnf "+str(N)+str(N)+str(N)+" "+
+    myfile.write("p cnf " + str(N*N) + str(N).zfill(2)  +" "+
                  str(sudoku_constraints_number(sudoku))+"\n")
     sudoku_generic_constraints(myfile, N)
     sudoku_specific_constraints(myfile, sudoku)
@@ -219,12 +460,13 @@ if mode == Mode.SOLVE or mode == Mode.UNIQUE:
             sys.stdout.write("\nother solution\n")
             sudoku_print(sys.stdout, sudoku)
 elif mode == Mode.CREATE:
+    print("Creation mode")
     size = int(sys.argv[2])
     sudoku = sudoku_generate(size)
     sys.stdout.write("\ngenerated sudoku\n")
     sudoku_print(sys.stdout, sudoku)
 elif mode == Mode.CREATEMIN:
     size = int(sys.argv[2])
-    sudoku = sudoku_generate(size)
+    sudoku = sudoku_generate_cm(size)
     sys.stdout.write("\ngenerated sudoku\n")
     sudoku_print(sys.stdout, sudoku)
